@@ -1,0 +1,76 @@
+<div class="w-full max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8 place-items-center py-4" x-data="dashboardData" x-init="initWebSocket()">
+ <template x-for="card in cards" :key="card.label">
+    <div class="bg-white p-4 rounded-2xl shadow text-center space-y-2 w-full max-w-xs">
+      <div class="text-xl font-semibold text-gray-600" x-text="card.label"></div>
+      <div class="w-16 h-16 mx-auto rounded-full shadow-inner transition-all duration-300"
+           :style="`background-color: ${card.color}`">
+      </div>
+      <div class="text-sm font-medium text-gray-500" x-text="card.description"></div>
+    </div>
+  </template>
+
+  <!-- Kartu indikator Pola Gerakan Terakhir (teks saja, tanpa bulatan) -->
+  <div class="bg-white p-4 rounded-2xl shadow text-center space-y-2 w-full max-w-xs col-span-full">
+    <div class="text-xl font-semibold text-gray-600">Pola Gerakan</div>
+    <div class="text-lg font-bold text-gray-800" x-text="polaGerak || 'Belum Terdeteksi'"></div>
+  </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script>
+  const socket = io("{{ config['FLASK_URL'] }}", {
+    transports: ['websocket'],
+  });
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('dashboardData', () => ({
+      // ✅ Data kartu indikator PIR & Ultrasonik
+      cards: [
+        { label: 'PIR 1', color: 'limegreen', description: 'Tidak Ada Gerakan' },
+        { label: 'PIR 2', color: 'limegreen', description: 'Tidak Ada Gerakan' },
+        { label: 'PIR 3', color: 'limegreen', description: 'Tidak Ada Gerakan' },
+        { label: 'Ultrasonik', color: 'limegreen', description: 'Tidak Ada Objek' },
+      ],
+      // ✅ Status pola gerakan terakhir (teks)
+      polaGerak: '',
+
+      // ✅ WebSocket handler
+      initWebSocket() {
+        socket.on('kandang_update', data => {
+          console.log("📡 Data WebSocket:", data);
+
+          // PIR 1–3
+          this.cards[0].color = data.pir1 ? 'red' : 'limegreen';
+          this.cards[0].description = data.pir1 ? 'Deteksi Gerakan' : 'Tidak Ada Gerakan';
+
+          this.cards[1].color = data.pir2 ? 'red' : 'limegreen';
+          this.cards[1].description = data.pir2 ? 'Deteksi Gerakan' : 'Tidak Ada Gerakan';
+
+          this.cards[2].color = data.pir3 ? 'red' : 'limegreen';
+          this.cards[2].description = data.pir3 ? 'Deteksi Gerakan' : 'Tidak Ada Gerakan';
+
+          // Ultrasonik
+          let jarak = data.jarak || 999;
+          if (jarak < 50) {
+            this.cards[3].color = 'red';
+            this.cards[3].description = 'Manusia Terdeteksi';
+          } else if (jarak >= 50 && jarak <= 150) {
+            this.cards[3].color = 'orange';
+            this.cards[3].description = 'Domba Terdeteksi';
+          } else {
+            this.cards[3].color = 'limegreen';
+            this.cards[3].description = 'Tidak Ada Objek';
+          }
+
+          // ✅ Ambil pola_gerakan terakhir
+          if (data.pola_gerakan) {
+            this.polaGerak = data.pola_gerakan;
+          }
+        });
+      }
+    }));
+  });
+</script>
+{% endblock %}
